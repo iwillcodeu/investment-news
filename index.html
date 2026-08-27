@@ -106,6 +106,29 @@
   .digest li .dj:hover{opacity:1; transform:translate(1px,-1px);}
   .row .ren{margin-top:3px; font-size:11.5px; line-height:1.35; color:hsl(var(--muted-foreground));
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.8;}
+  /* ---- 单条 AI 摘要 ---- */
+  .row .ai-btn{flex-shrink:0; width:28px; height:28px; border-radius:8px; border:1px solid hsl(var(--border));
+    background:transparent; color:hsl(var(--muted-foreground)); cursor:pointer; display:grid; place-items:center;
+    opacity:0; pointer-events:none; transition:opacity .14s, color .14s, border-color .14s, background .14s; font-size:14px; line-height:1;}
+  .row:hover .ai-btn, .row:focus-within .ai-btn{opacity:1; pointer-events:auto;}
+  .ai-btn:hover{color:hsl(var(--primary)); border-color:hsl(var(--primary)/.45); background:hsl(var(--primary)/.10);}
+  .ai-btn.busy{opacity:1; pointer-events:none; color:hsl(var(--primary));}
+  @media (hover:none){.row .ai-btn{opacity:.85; pointer-events:auto;}}
+  .sum-mask{position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.55); display:grid; place-items:center;
+    padding:24px; backdrop-filter:blur(3px);}
+  .sum-box{width:min(560px,100%); max-height:min(78vh,640px); overflow:auto; border-radius:14px;
+    border:1px solid hsl(var(--border)); background:hsl(var(--card)); box-shadow:0 18px 50px rgba(0,0,0,.45);
+    padding:18px 20px 16px; display:flex; flex-direction:column; gap:12px;}
+  .sum-box .st{font-size:15px; font-weight:700; letter-spacing:-.01em; line-height:1.4; padding-right:8px;}
+  .sum-box .sb{font-size:13.5px; line-height:1.65; color:hsl(var(--foreground)); white-space:pre-wrap; min-height:4.5em;}
+  .sum-box .sb.muted{color:hsl(var(--muted-foreground));}
+  .sum-box .sb.err{color:#f87171;}
+  .sum-box .sf{display:flex; justify-content:flex-end; gap:8px; margin-top:4px;}
+  .sum-box .sf button{font:inherit; font-size:12.5px; padding:7px 12px; border-radius:8px; cursor:pointer;
+    border:1px solid hsl(var(--border)); background:transparent; color:hsl(var(--foreground));}
+  .sum-box .sf button.pri{border-color:hsl(var(--primary)/.5); color:hsl(var(--primary)); background:hsl(var(--primary)/.10);}
+  .sum-box .sf button:hover{border-color:hsl(var(--primary)/.45);}
+  .sum-box .sf button:disabled{opacity:.45; cursor:not-allowed;}
 </style>
 </head>
 <body>
@@ -194,19 +217,21 @@ function boot(){
     ) : '';
 
     // 新闻行(中文标题 + 原文小字)
-    var rows = ind.items.map(function(it){
+    var rows = ind.items.map(function(it, idx){
       var hasZh = it.zh && it.zh.trim();
       var primary = esc(hasZh ? it.zh : it.title);
       var secondary = hasZh ? esc(it.title) : esc(it.summary||'');
       var su = safeUrl(it.url);
       var link = su ? '<a class="rt" href="'+su+'" target="_blank" rel="noopener">'+primary+'</a>'
                     : '<span class="rt">'+primary+'</span>';
+      var ai = su ? '<button type="button" class="ai-btn" data-i="'+idx+'" title="AI 总结这篇">✦</button>' : '';
       return '<div class="row" onmouseover="this.style.borderColor=\''+hexA(ac,0.45)+'\'" onmouseout="this.style.borderColor=\'\'">'
         + '<span class="rdot" style="background:'+ac+'"></span>'
         + '<div class="rbody">' + link
         + (secondary?'<div class="'+(hasZh?'ren':'rs')+'">'+secondary+'</div>':'')
         + '</div>'
         + '<div class="rmeta">'
+        +   ai
         +   '<span class="rsrc" style="background:'+hexA(ac,0.12)+';color:'+ac+'">'+esc(it.source)+'</span>'
         +   '<span class="rtm">'+esc(it.time||'—')+'</span>'
         + '</div></div>';
@@ -214,10 +239,135 @@ function boot(){
 
     board.className='';
     board.innerHTML = digest + '<div class="list">' + rows + '</div>';
+    board.querySelectorAll('.ai-btn').forEach(function(btn){
+      btn.onclick = function(e){
+        e.preventDefault(); e.stopPropagation();
+        var it = ind.items[+btn.getAttribute('data-i')];
+        if(!it || !it.url) return;
+        openSummary({
+          url: it.url,
+          title: (it.zh && it.zh.trim()) ? it.zh : (it.title || ''),
+          btn: btn
+        });
+      };
+    });
   }
   function esc(s){return (s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   // 外链来自 RSS <link>(源方可控):只放行 http(s) 并转义,防属性逃逸 XSS 和 javascript: 伪协议
   function safeUrl(u){u=(''+(u||'')).trim();return /^https?:\/\//i.test(u)?esc(u):'';}
+
+  var _sumInflight = {};
+  function cacheKey(url){ return 'invnews:summary:' + url; }
+  function readCache(url){
+    try{
+      var raw = sessionStorage.getItem(cacheKey(url));
+      if(!raw) return null;
+      var o = JSON.parse(raw);
+      return (o && o.summary) ? o : null;
+    }catch(e){ return null; }
+  }
+  function writeCache(url, summary, title){
+    try{
+      sessionStorage.setItem(cacheKey(url), JSON.stringify({summary:summary, title:title||'', at:Date.now()}));
+    }catch(e){}
+  }
+  function clearCache(url){
+    try{ sessionStorage.removeItem(cacheKey(url)); }catch(e){}
+  }
+
+  function openSummary(opts){
+    var url = opts.url, title = opts.title || '', force = !!opts.force;
+    var existing = document.querySelector('.sum-mask');
+    if(existing) existing.remove();
+
+    var mask = document.createElement('div');
+    mask.className = 'sum-mask';
+    mask.innerHTML =
+      '<div class="sum-box" role="dialog" aria-modal="true">'
+      + '<div class="st"></div>'
+      + '<div class="sb muted">正在生成摘要…</div>'
+      + '<div class="sf">'
+      +   '<button type="button" class="sum-regen pri">重新生成</button>'
+      +   '<button type="button" class="sum-close">关闭</button>'
+      + '</div></div>';
+    document.body.appendChild(mask);
+    var box = mask.querySelector('.sum-box');
+    var st = mask.querySelector('.st');
+    var sb = mask.querySelector('.sb');
+    var regen = mask.querySelector('.sum-regen');
+    var closeBtn = mask.querySelector('.sum-close');
+    st.textContent = title || url;
+
+    function close(){
+      document.removeEventListener('keydown', onKey);
+      mask.remove();
+    }
+    function onKey(ev){ if(ev.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey);
+    mask.addEventListener('click', function(ev){ if(ev.target === mask) close(); });
+    closeBtn.onclick = close;
+    box.addEventListener('click', function(ev){ ev.stopPropagation(); });
+
+    function setBusy(on){
+      regen.disabled = on;
+      if(opts.btn) opts.btn.classList.toggle('busy', on);
+    }
+    function showErr(msg){
+      sb.className = 'sb err';
+      sb.textContent = msg || '摘要失败';
+    }
+    function showOk(text){
+      sb.className = 'sb';
+      sb.textContent = text;
+    }
+
+    function request(forceReq){
+      if(!forceReq){
+        var hit = readCache(url);
+        if(hit){ showOk(hit.summary); return; }
+      } else {
+        clearCache(url);
+      }
+      if(_sumInflight[url]){
+        setBusy(true);
+        sb.className = 'sb muted'; sb.textContent = '正在生成摘要…';
+        _sumInflight[url].then(function(d){
+          setBusy(false);
+          if(d && d.ok) showOk(d.summary); else showErr((d && d.error) || '摘要失败');
+        }).catch(function(e){ setBusy(false); showErr(String(e)); });
+        return;
+      }
+      setBusy(true);
+      sb.className = 'sb muted'; sb.textContent = '正在抓取原文并生成摘要…';
+      var p = fetch('api/summarize', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url: url, title: title, force: !!forceReq})
+      }).then(function(r){ return r.json().then(function(d){ return d; }).catch(function(){
+          return {ok:false, error:'响应解析失败 ('+r.status+')'};
+        });
+      }).then(function(d){
+        delete _sumInflight[url];
+        setBusy(false);
+        if(d && d.ok && d.summary){
+          writeCache(url, d.summary, title);
+          showOk(d.summary);
+        } else {
+          showErr((d && d.error) || '摘要失败');
+        }
+        return d;
+      }).catch(function(e){
+        delete _sumInflight[url];
+        setBusy(false);
+        showErr(String(e));
+        return {ok:false, error:String(e)};
+      });
+      _sumInflight[url] = p;
+    }
+
+    regen.onclick = function(){ request(true); };
+    request(force);
+  }
 
   if(active) setActive(active);
 

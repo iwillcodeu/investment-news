@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""server.py —— 本地看板服务 + 刷新接口(纯标准库)。
+"""server.py —— 本地看板服务 + 刷新/单篇摘要接口(纯标准库)。
 - 静态服务整个 investment-news 目录(看板、data、脚本)
 - POST /api/refresh → 跑 scripts/fetch.py(抓取+红线+最近N天) 再跑 scripts/digest.py
   (用 llm.config.json 配的大模型出「今日要点」+翻译),完成后返回 JSON。前端按钮转圈等它。
+- POST /api/summarize → 抓取单篇 URL 正文并用配置的大模型生成中文摘要。
 跑法: python3 server.py [port]   默认 8793
 """
 import os, sys, json, subprocess
@@ -58,9 +59,37 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _json(self, payload, code=200):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _summarize(self):
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(n) if n > 0 else b"{}"
+            body = json.loads(raw.decode("utf-8") or "{}")
+            url = (body.get("url") or "").strip()
+            title = (body.get("title") or "").strip()
+            scripts = os.path.join(HERE, "scripts")
+            if scripts not in sys.path:
+                sys.path.insert(0, scripts)
+            import summarize as summod  # noqa: WPS433
+            payload = summod.summarize(url, title)
+            code = 200 if payload.get("ok") else 400
+        except Exception as e:
+            payload, code = {"ok": False, "error": str(e)}, 500
+        return self._json(payload, code)
+
     def do_POST(self):
-        if self.path.startswith("/api/refresh"):
+        path = self.path.split("?", 1)[0]
+        if path.startswith("/api/refresh"):
             return self._refresh()
+        if path == "/api/summarize" or path.startswith("/api/summarize"):
+            return self._summarize()
         self.send_error(404)
 
     def do_GET(self):
