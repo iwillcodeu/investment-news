@@ -1,6 +1,6 @@
-# Investment News · 投资资讯
+<p align="center"><b>简体中文</b> | <a href="README_en.md">English</a></p>
 
-**中文** · [English](README.en.md)
+<h1 align="center">Investment News · 投资资讯</h1>
 
 <p align="center">
   <b>为 A股投资者追踪全球产业链领先信号 —— 12 大赛道一一对应 A股板块，覆盖 100+ 权威源，AI 每日提炼为中文要点，全程本地、零 API key。</b><br>
@@ -8,13 +8,22 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.1-blue.svg" alt="version 1.0.1">
+  <img src="https://img.shields.io/badge/version-1.0.3-blue.svg" alt="version 1.0.3">
   <img src="https://img.shields.io/badge/python-3.7+-blue.svg" alt="Python 3.7+">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT">
   <img src="https://img.shields.io/badge/赛道-12_大方向-orange.svg" alt="12 sectors">
   <img src="https://img.shields.io/badge/信息源-100+_权威媒体-red.svg" alt="100+ sources">
   <img src="https://img.shields.io/badge/依赖-纯标准库-lightgrey.svg" alt="stdlib">
   <img src="https://img.shields.io/badge/大模型-订阅_or_API-purple.svg" alt="LLM">
+</p>
+
+<p align="center">
+  <a href="#这是什么">这是什么</a> ·
+  <a href="#能力-features">能力</a> ·
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#工作原理">工作原理</a> ·
+  <a href="#配置大模型订阅--api-二选一">配置大模型</a> ·
+  <a href="#覆盖赛道与信息源">覆盖赛道</a>
 </p>
 
 ---
@@ -33,7 +42,7 @@
 
 > 📊 **本工具呈现的是行业动向与领先信号，并非行情数据，更不构成投资建议。** Industry trends, **not financial advice**.
 
-## ✨ 能力 Features
+## 能力 Features
 
 | 能力 | 说明 |
 |---|---|
@@ -46,13 +55,13 @@
 | **本⁠地⁠运⁠行** | 抓取与呈现均在本地完成，数据全程留存本机；无数据库、无托管、无 RSSHub |
 | **合⁠规⁠过⁠滤** | 内置关键词过滤，自动剔除博彩、预测市场、加密货币、色情类内容；时政、财经正常收录 |
 
-## 📸 截图 Screenshot
+## 截图 Screenshot
 
 ![dashboard](docs/screenshot.png)
 
 > **本工具的核心交付物是这个浏览器看板。** 运行后，所有操作的终点都是访问 `http://localhost:8793` —— 今日要点、中文翻译、赛道分区、原文跳转，均集中于该页面。
 
-## 🚀 快速开始
+## 快速开始
 
 **环境要求**：Python 3.7+（标准库即可，**无需安装任何第三方包**）+ 一个大模型（下方二选一）。
 
@@ -68,7 +77,26 @@ open http://localhost:8793   # Windows 使用 start，Linux 使用 xdg-open
 # 4) 点击左上角 ⟳，触发抓取与 AI 摘要，完成后自动刷新
 ```
 
-## ⚙️ 工作原理
+### 网络环境（海外源抓不动时看这里）
+
+106 个源里大部分是海外媒体。在直连不畅的网络下，会看到抓取结束时打印「N/106 个源抓取失败」。两个可调项：
+
+```bash
+# 走代理：urllib 原生读这两个环境变量，无需改代码
+export HTTPS_PROXY=http://127.0.0.1:7897
+export HTTP_PROXY=http://127.0.0.1:7897
+
+# 放宽单源超时（默认 30 秒），链路差时可以再加
+export FETCH_TIMEOUT=45
+
+python3 server.py
+```
+
+> 从看板按 ⟳ 触发时，子进程会继承你启动 `server.py` 那个 shell 的环境变量，所以代理要在启动前 export。
+>
+> **不建议关闭证书校验。** 如果大量源报 `CERTIFICATE_VERIFY_FAILED`，通常是本机证书链的问题而非本项目的：macOS 上用 python.org 安装包装的 Python 需要先跑一次 `Install Certificates.command`；走 MITM 代理则需要把代理的根证书装进系统信任。这些都比全局关掉校验安全。
+
+## 工作原理
 
 ```
 sources.json  (108 个源 / 12 赛道)
@@ -85,7 +113,7 @@ sources.json  (108 个源 / 12 赛道)
 
 全流程基于**纯 Python 标准库 + 一个大模型**，无数据库、无 RSSHub、无托管服务。`claude-cli` 模式下，`digest` 调用本机 `claude -p`（订阅鉴权、禁用全部工具、仅处理文本），**仅本地可用、零成本**。
 
-## 🤖 配置大模型（订阅 / API 二选一）
+## 配置大模型（订阅 / API 二选一）
 
 编辑 `llm.config.json`：
 
@@ -101,7 +129,7 @@ sources.json  (108 个源 / 12 赛道)
   "api": { "base_url": "https://api.deepseek.com", "api_key": "sk-...", "model": "deepseek-chat" } }
 ```
 
-## 🌐 覆盖赛道与信息源
+## 覆盖赛道与信息源
 
 12 大赛道、108 个精选源，**英文权威媒体与中文垂直媒体并重**，例如：
 
@@ -113,7 +141,7 @@ sources.json  (108 个源 / 12 赛道)
 
 > 完整清单见 `sources.json`。增删或修复信息源，仅需编辑该文件。
 
-## ➕ 新增信息源 = 增加一行
+## 新增信息源 = 增加一行
 
 在 `sources.json` 的 `sources` 数组中增加一行即可，无需改动代码：
 
@@ -124,7 +152,7 @@ sources.json  (108 个源 / 12 赛道)
 `hint` 为赛道标识（ai / semi / robot / auto / energy / bio / space / security / tech / consumer / macro / science）。
 `fetch.recent_days` 控制时间窗口（默认 7 天）；`redline_keywords` 为合规过滤词表。
 
-## 🗂️ 项目结构
+## 项目结构
 
 ```
 investment-news/
@@ -141,13 +169,13 @@ investment-news/
 └── docs/screenshot.png
 ```
 
-## 🧰 技术栈与依赖
+## 技术栈与依赖
 
 - **Python 3.7+**，**纯标准库**（urllib / json / xml.etree / http.server / subprocess）—— 抓取与看板零第三方依赖。
 - **一个大模型**：本机 Claude Code 订阅（`claude-cli`，$0），或任意 OpenAI 兼容 API key。
 - 需联网访问信息源（部分国际源可能需要代理）。
 
-## ⚖️ 使用边界 / 免责声明
+## 使用边界 / 免责声明
 
 - **仅本地运行**：不含任何托管、上传或服务端，数据仅留存于本机。
 - **仅读取公开 RSS / 接口**，保持低频访问，并遵守各信息源的服务条款。
@@ -155,12 +183,18 @@ investment-news/
 
 本软件依 [MIT 许可](LICENSE) 以「现状」提供，不附带任何形式的担保。
 
-## 🙋 作者
+## 赞赏
 
-**Simon 林** · 抖音「Simon林」· 公众号「硅基世纪」
+如果这个工具帮到了你，欢迎请作者喝杯咖啡。
+
+<p align="center">
+  <a href="https://buymeacoffee.com/simonlin1212"><img src="./assets/bmc-qr.png" width="180" alt="Buy Me a Coffee"></a>
+</p>
+
+## License
+
+[MIT](LICENSE)
 
 一个将全球行业资讯提炼为中文要点的本地看板。欢迎提交 PR 补充更多赛道与信息源。
 
-## 📄 License
-
-[MIT](LICENSE)
+**作者：** Simon 林 · X [@linsizhen](https://x.com/linsizhen) · 邮箱：[simonlin0423@gmail.com](mailto:simonlin0423@gmail.com)
