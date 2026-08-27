@@ -11,6 +11,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8793
+# 默认回环；服务器部署可设 BIND_HOST=0.0.0.0 对外提供 IP+端口访问
+BIND_HOST = os.environ.get("BIND_HOST", "127.0.0.1")
 
 
 def child_env():
@@ -63,6 +65,6 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("看板服务已启动: http://localhost:%d/index.html   (Ctrl+C 停止)" % PORT)
-    # 只绑回环:看板+/api/refresh 会跑本机子进程(fetch.py/claude),绝不能对局域网开放。
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    print("看板服务已启动: http://%s:%d/index.html   (Ctrl+C 停止)" % (BIND_HOST, PORT))
+    # 默认只绑回环；服务器需对外时设 BIND_HOST=0.0.0.0（/api/refresh 会跑本机子进程，勿对不可信网络裸奔）。
+    ThreadingHTTPServer((BIND_HOST, PORT), Handler).serve_forever()

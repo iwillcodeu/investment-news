@@ -225,7 +225,8 @@ function boot(){
   if(rb) rb.onclick = function(){
     if(rb.classList.contains('spin')) return;
     rb.classList.add('spin');
-    fetch('/api/refresh', {method:'POST'})
+    // 相对路径：直连根路径或反代子路径(/dailynews/)均可
+    fetch('api/refresh', {method:'POST'})
       .then(function(r){ return r.json(); })
       .then(function(d){
         if(d && d.ok){ location.reload(); }
